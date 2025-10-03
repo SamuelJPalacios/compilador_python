@@ -7,7 +7,7 @@ class ventanaPrincipal:
         # Configuración de la ventana
         self.root = root
         self.root.title("Proyecto Final Compilador")
-        self.root.geometry("1200x600")
+        self.root.geometry("1200x700")
 
         # Etiqueta para la caja de texto
         self.code_label = tk.Label(root, text = "Escriba su codigo aqui:")
@@ -16,6 +16,10 @@ class ventanaPrincipal:
         # Widget de texto con scroll
         self.code_area = scrolledtext.ScrolledText(root, wrap = tk.WORD, width = 50, height = 10, font = ("Times New Roman", 16))
         self.code_area.pack(padx = 10, pady = 10)
+
+        # Botón para iniciar el análisis
+        self.analyze_button = tk.Button(root, text = "Iniciar Compilación", command = self.run_analysis, font = ("Arial", 14))
+        self.analyze_button.pack (pady = 10)
 
         # Contenedor de las pestañas de los procesos (Notebook)
         self.notebook = ttk.Notebook(root)
@@ -96,6 +100,22 @@ class ventanaPrincipal:
         admin_errores_label.pack(pady = 10)
         self.admin_errores_output = scrolledtext.ScrolledText(self.admin_errores, wrap = tk.WORD, width = 100, height = 10, font = ("Times New Roman", 16))
         self.admin_errores_output.pack(padx = 10, pady = 10)
+
+        # Métodos de análisis (placeholders)
+        def clear_and_insert (self, widget, content):
+            """ Función para limpiar y agregar contenido a un widget de texto """
+            widget.config (state = 'normal')
+            widget.delte ("1.0", tk.END)
+            widget.insert (tk.END, content)
+            widget.config (state = 'disabled')
+
+        def run_analysis (self):
+            """ Método para el boton Iniciar Compilación """
+            source_code = self.code_area.get("1.0", tk.END).strip()
+            if not source_code:
+                return
+            
+            # Ejecucución del Análisis Léxico
 
 if __name__ == "__main__":
     root = tk.Tk()
