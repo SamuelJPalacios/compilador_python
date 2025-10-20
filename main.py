@@ -113,9 +113,14 @@ class ventanaPrincipal:
             """ Método para el boton Iniciar Compilación """
             source_code = self.code_area.get("1.0", tk.END).strip()
             if not source_code:
+                self.clear_and_insert(self.analisis_lexico_output, "Por favor, ingrese código para analizar.")
                 return
             
             # Ejecucución del Análisis Léxico
+            lexical_output = self.perform_lexical_analysis(source_code)
+
+            # Mostrar el resultado en la pestaña de Análisis Léxico
+            self.clear_and_insert(self.analisis_lexico_output, lexical_output)
 
 if __name__ == "__main__":
     root = tk.Tk()
