@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import ttk
+import token
 
 class ventanaPrincipal:
     def __init__(self, root):
@@ -121,46 +122,120 @@ class ventanaPrincipal:
 
         # Mostrar el resultado en la pestaña de Análisis Léxico
         self.clear_and_insert(self.analisis_lexico_output, lexical_output)
-        self.analisis_lexico_output.config(state='normal') # Habilita la edición del widget temporalmente
-        self.analisis_lexico_output.insert(tk.END, lexical_output) # Inserta el resultado del analisis léxico
-        self.analisis_lexico_output.config(state='disabled') # Deshabilita la edición del widget nuevamente
 
     def perform_lexical_analysis(self, code):
-        # Simulacion de la creacion de tokens
+        """
+        Simula el análisis léxico, identificando tokens únicos y
+        ordenándolos por tipo: Variables, Signos, Símbolos, Números.
+        """
         if not code:
             return "No hay código para analizar"
+
+        # 1. Definición de Tipos y Grupos de Tokens
+        KEYWORDS = {"return", "int", "float", "void", "boolean", "double"}
+        # CAMBIO CLAVE: Usamos un diccionario para mapear el SIGNO a su NOMBRE
+        OPERATORS_MAP = {
+            "+": "ADICIÓN",
+            "-": "SUSTRACCIÓN",
+            "*": "PRODUCTO",
+            "/": "COCIENTE",
+            "^": "ACENTO CIRCUNFLEJO",
+        }
+        OPERATORS = set(OPERATORS_MAP.keys()) # Creamos el conjunto de signos a partir de las claves del diccionario        
+        INDIVIDUAL_SIMBOLS = {"="}
         
-        #Lista de palabras clave y Operadores
-        KEYWORDS = ["return", "int", "float", "void", "boolean", "double"]
-        OPERATORS = ["+", "-", "*", "/", "^"]
-        SIMBOL = ["=", "(", ")"]
+        AGRUPATION_TOKEN = "()"
+        AGRUPATION_NAME = "AGRUPACIÓN"
 
-        # Dejar espacios entre los operadores y palabras clave
-        for op in OPERATORS:
-            code = code.replace(op, f' {op} ')
-
-        # Obtener una lista de lexemas
+        code = code.replace("{", " ") # Reemplazamos llaves de apertura con espacio (para ignorarlas)
+        code = code.replace("}", " ") # Reemplazamos llaves de cierre con espacio (para ignorarlas)
+        code = code.replace("()", f" {AGRUPATION_TOKEN} ")
+        
+        # 2. Preprocesamiento: Separar los tokens por espacios.
+        # Se reemplazan operadores/símbolos con espacios para que la función split los separe.
+        for op in OPERATORS | INDIVIDUAL_SIMBOLS: # Usamos UNION (|) de sets para los reemplazos
+            code = code.replace(op, f" {op} ")
+            
+        # Usamos split() para obtener los lexemas (tokens) reales.
         tokens = [part.strip() for part in code.split() if part.strip()]
 
-        # Generar la salida del análisis léxico
-        lexical_output = ""
+        # 3. Clasificación de Tokens y Eliminación de Duplicados
+        # Usaremos un diccionario para almacenar los tokens únicos, agrupados por su tipo.
+        # El orden en las llaves es el orden de impresión deseado.
+        classified_tokens = {
+            'VARIABLE': set(),
+            'SIGNO': set(),
+            'SIMBOLO': set(),
+            'NUMERO': set()
+        }
+
         for token in tokens:
+
             if token in KEYWORDS:
-                token_type = "PALABRA_CLAVE"
+                continue
+
+            token_type = ""
+            
+            if token in KEYWORDS: # Las palabras clave se consideran PALABRA_CLAVE, pero las agruparemos con VARIABLES
+                token_type = "VARIABLE"
             elif token in OPERATORS:
                 token_type = "SIGNO"
-            elif token in SIMBOL:
+                classified_tokens[token_type].add((token, OPERATORS_MAP[token]))
+                continue
+            elif token == AGRUPATION_TOKEN:
                 token_type = "SIMBOLO"
-            elif token.isdigit:
+                classified_tokens[token_type].add((token, AGRUPATION_NAME))
+                continue
+            elif token in INDIVIDUAL_SIMBOLS:
+                token_type = "SIMBOLO"
+                classified_tokens[token_type].add((token, token.upper()))
+                continue
+            elif token.replace('.', '', 1).isdigit():
+                # Verificación robusta para números (enteros o flotantes)
                 token_type = "NUMERO"
-            elif token.isalpha:
+            elif token.isalpha() or (token[0].isalpha() and token.isalnum()):
+                # Identificadores (Variables)
                 token_type = "VARIABLE"
             else:
-                token_type = "DESCONOCIDO"
-            lexical_output += f'Token: {token}, Tipo: {token_type}\n'
+                # No clasificado (ej: cadena de texto, error léxico)
+                token_type = "OTROS"
+            
+            # Agregamos el token a su conjunto correspondiente (esto elimina duplicados automáticamente)
+            if token_type in classified_tokens:
+                classified_tokens[token_type].add(token)
 
-        return lexical_output
+        # 4. Generación de la Salida Ordenada
+        output_lines = ["--- RESULTADO DEL ANÁLISIS LÉXICO ---"]
 
+        # Definimos el orden de impresión explícitamente
+        print_order = ['VARIABLE', 'SIGNO', 'SIMBOLO', 'NUMERO']
+
+        for type_name in print_order:
+        
+            if type_name == 'SIGNO':
+                # MANEJO ESPECIAL PARA SIGNOS (Tuplas de 2 elementos: signo, nombre)
+                tokens_list = sorted(list(classified_tokens[type_name]), key=lambda x: x[0])
+            elif type_name == 'SIMBOLO':
+                # MANEJO ESPECIAL PARA SÍMBOLOS (Tuplas de 2 elementos: simbolo, nombre)
+                tokens_list = sorted(list(classified_tokens[type_name]), key=lambda x: x[0])
+            else:
+                # MANEJO ESTÁNDAR para otros tipos (Variables y Números)
+                tokens_list = sorted(list(classified_tokens[type_name]))
+                
+            if tokens_list:
+                output_lines.append(f"\n[{type_name.upper()}]:")
+                
+                for token_item in tokens_list:
+                    if type_name in ('SIGNO', 'SIMBOLO'):
+                        # Desempaquetar la tupla (token, nombre)
+                        token, nombre = token_item
+                        output_lines.append(f"{token} Tipo: {type_name.capitalize()} ({nombre.capitalize()})")
+                    else:
+                        # Formato para Variables y Números
+                        output_lines.append(f"{token_item} Tipo: {type_name.capitalize()}")
+
+        return '\n'.join(output_lines)
+    
 if __name__ == "__main__":
     root = tk.Tk()
     app = ventanaPrincipal(root)
