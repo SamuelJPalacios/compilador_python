@@ -101,26 +101,65 @@ class ventanaPrincipal:
         self.admin_errores_output = scrolledtext.ScrolledText(self.admin_errores, wrap = tk.WORD, width = 100, height = 10, font = ("Times New Roman", 16))
         self.admin_errores_output.pack(padx = 10, pady = 10)
 
-        # Métodos de análisis (placeholders)
-        def clear_and_insert (self, widget, content):
-            """ Función para limpiar y agregar contenido a un widget de texto """
-            widget.config (state = 'normal')
-            widget.delte ("1.0", tk.END)
-            widget.insert (tk.END, content)
-            widget.config (state = 'disabled')
+    # Métodos de análisis (placeholders)
+    def clear_and_insert (self, widget, content):
+        """ Función para limpiar y agregar contenido a un widget de texto """
+        widget.config (state = 'normal')
+        widget.delete ("1.0", tk.END)
+        widget.insert (tk.END, content)
+        widget.config (state = 'disabled')
 
-        def run_analysis (self):
-            """ Método para el boton Iniciar Compilación """
-            source_code = self.code_area.get("1.0", tk.END).strip()
-            if not source_code:
-                self.clear_and_insert(self.analisis_lexico_output, "Por favor, ingrese código para analizar.")
-                return
-            
-            # Ejecucución del Análisis Léxico
-            lexical_output = self.perform_lexical_analysis(source_code)
+    def run_analysis (self):
+        """ Método para el boton Iniciar Compilación """
+        source_code = self.code_area.get("1.0", tk.END).strip()
+        if not source_code:
+            self.clear_and_insert(self.analisis_lexico_output, "Por favor, ingrese código para analizar.")
+            return
+        
+        # Ejecucución del Análisis Léxico
+        lexical_output = self.perform_lexical_analysis(source_code)
 
-            # Mostrar el resultado en la pestaña de Análisis Léxico
-            self.clear_and_insert(self.analisis_lexico_output, lexical_output)
+        # Mostrar el resultado en la pestaña de Análisis Léxico
+        self.clear_and_insert(self.analisis_lexico_output, lexical_output)
+        self.analisis_lexico_output.config(state='normal') # Habilita la edición del widget temporalmente
+        self.analisis_lexico_output.insert(tk.END, lexical_output) # Inserta el resultado del analisis léxico
+        self.analisis_lexico_output.config(state='disabled') # Deshabilita la edición del widget nuevamente
+
+    def perform_lexical_analysis(self, code):
+        # Simulacion de la creacion de tokens
+        if not code:
+            return "No hay código para analizar"
+        
+        #Lista de palabras clave y Operadores
+        KEYWORDS = ["return", "int", "float", "void", "boolean", "double"]
+        OPERATORS = ["+", "-", "*", "/", "^"]
+        SIMBOL = ["=", "(", ")"]
+
+        # Dejar espacios entre los operadores y palabras clave
+        for op in OPERATORS:
+            code = code.replace(op, f' {op} ')
+
+        # Obtener una lista de lexemas
+        tokens = [part.strip() for part in code.split() if part.strip()]
+
+        # Generar la salida del análisis léxico
+        lexical_output = ""
+        for token in tokens:
+            if token in KEYWORDS:
+                token_type = "PALABRA_CLAVE"
+            elif token in OPERATORS:
+                token_type = "SIGNO"
+            elif token in SIMBOL:
+                token_type = "SIMBOLO"
+            elif token.isdigit:
+                token_type = "NUMERO"
+            elif token.isalpha:
+                token_type = "VARIABLE"
+            else:
+                token_type = "DESCONOCIDO"
+            lexical_output += f'Token: {token}, Tipo: {token_type}\n'
+
+        return lexical_output
 
 if __name__ == "__main__":
     root = tk.Tk()
