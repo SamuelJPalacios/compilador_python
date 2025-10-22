@@ -1,3 +1,4 @@
+from num2words import num2words
 import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import ttk
@@ -102,6 +103,10 @@ class ventanaPrincipal:
         self.admin_errores_output = scrolledtext.ScrolledText(self.admin_errores, wrap = tk.WORD, width = 100, height = 10, font = ("Times New Roman", 16))
         self.admin_errores_output.pack(padx = 10, pady = 10)
 
+######################################################################
+######################################################################
+######################################################################
+
     # Métodos de análisis (placeholders)
     def clear_and_insert (self, widget, content):
         """ Función para limpiar y agregar contenido a un widget de texto """
@@ -123,116 +128,164 @@ class ventanaPrincipal:
         # Mostrar el resultado en la pestaña de Análisis Léxico
         self.clear_and_insert(self.analisis_lexico_output, lexical_output)
 
+    # Función para convertir números a texto en español
+    def number_to_text(self, number_str):
+        """Convierte una cadena de número a palabras en español."""
+        try:
+            # Reemplazamos el punto decimal por 'coma' para num2words en español
+            number_str = number_str.replace('.', ' punto ', 1)
+            # Intentamos convertir a float, si falla, es un entero
+            number = float(number_str)
+            
+            # num2words convierte el número a palabras en español
+            text = num2words(number, lang='es').upper() 
+            
+            # Limpieza simple para que el formato sea solo palabras
+            return text.replace('-', ' ')
+        except ValueError:
+            return "ERROR_CONV"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    # ⭐️ FUNCIÓN AUXILIAR PARA CONVERTIR NÚMEROS A PALABRAS (Debe estar definida en la clase)
+    def number_to_text(self, number_str):
+        """Convierte una cadena de número a palabras en español."""
+        try:
+            # Reemplazamos el punto decimal por 'punto' para num2words en español
+            number_str = number_str.replace('.', ' punto ', 1)
+            number = float(number_str.replace(' punto ', '.'))
+            text = num2words(number, lang='es').upper()
+            return text.replace('-', ' ')
+        except ValueError:
+            return "ERROR_CONV"
+        except Exception:
+            return "ERROR_INTERNO"
+
+
     def perform_lexical_analysis(self, code):
         """
-        Simula el análisis léxico, identificando tokens únicos y
-        ordenándolos por tipo: Variables, Signos, Símbolos, Números.
+        Simula el análisis léxico: maneja paréntesis separados, asigna nombre a '=',
+        y asegura la correcta detección de números.
         """
         if not code:
             return "No hay código para analizar"
 
         # 1. Definición de Tipos y Grupos de Tokens
         KEYWORDS = {"return", "int", "float", "void", "boolean", "double"}
-        # CAMBIO CLAVE: Usamos un diccionario para mapear el SIGNO a su NOMBRE
+        
+        # Mapeo de Operadores para el tipo SIGNO
         OPERATORS_MAP = {
             "+": "ADICIÓN",
             "-": "SUSTRACCIÓN",
-            "*": "PRODUCTO",
+            "*": "MULTIPLICACIÓN",
             "/": "COCIENTE",
-            "^": "ACENTO CIRCUNFLEJO",
+            "^": "EXPONENTE",
         }
-        OPERATORS = set(OPERATORS_MAP.keys()) # Creamos el conjunto de signos a partir de las claves del diccionario        
-        INDIVIDUAL_SIMBOLS = {"="}
-        
-        AGRUPATION_TOKEN = "()"
-        AGRUPATION_NAME = "AGRUPACIÓN"
+        OPERATORS = set(OPERATORS_MAP.keys())
 
-        code = code.replace("{", " ") # Reemplazamos llaves de apertura con espacio (para ignorarlas)
-        code = code.replace("}", " ") # Reemplazamos llaves de cierre con espacio (para ignorarlas)
-        code = code.replace("()", f" {AGRUPATION_TOKEN} ")
+        # ⭐️ CAMBIO CLAVE 1: Agregamos el par de paréntesis y el '=' al mapa para darles nombre
+        SIMBOLS_MAP = {
+            "=": "ASIGNACIÓN", # ⭐️ SOLUCIÓN 3: Nombre descriptivo
+            ";": "PUNTO_Y_COMA",
+            "(": "PARÉNTESIS_APERTURA", # Los tratamos individualmente en el preproceso
+            ")": "PARÉNTESIS_CIERRE",   # para poder agruparlos luego
+        }
+        INDIVIDUAL_SIMBOLS = set(SIMBOLS_MAP.keys())
         
-        # 2. Preprocesamiento: Separar los tokens por espacios.
-        # Se reemplazan operadores/símbolos con espacios para que la función split los separe.
-        for op in OPERATORS | INDIVIDUAL_SIMBOLS: # Usamos UNION (|) de sets para los reemplazos
-            code = code.replace(op, f" {op} ")
-            
-        # Usamos split() para obtener los lexemas (tokens) reales.
+        # Símbolos a IGNORAR
+        IGNORE_SIMBOLS = {"{", "}"}
+
+        # 2. Preprocesamiento: Aislar Símbolos y Operadores
+        
+        # ⭐️ SOLUCIÓN 1 y 2: Aislamiento flexible de todos los símbolos (incluidos paréntesis)
+        for char_to_isolate in OPERATORS | INDIVIDUAL_SIMBOLS | IGNORE_SIMBOLS:
+            code = code.replace(char_to_isolate, f" {char_to_isolate} ")
+        
+        # Eliminamos múltiples espacios y saltos de línea
+        code = ' '.join(code.split())
+        
+        # ⭐️ Solución al problema de agrupacion y deteccion unica de parentesis:
+        # Reemplazamos los paréntesis individuales por un único token si aparecen juntos.
+        # Para simplificar y mantener el par único en la salida (como pedías en pasos anteriores),
+        # podemos recolectar los paréntesis individuales y darles un nombre genérico "AGRUPACIÓN"
+        # en la salida final usando el set para la unicidad.
+        
         tokens = [part.strip() for part in code.split() if part.strip()]
 
         # 3. Clasificación de Tokens y Eliminación de Duplicados
-        # Usaremos un diccionario para almacenar los tokens únicos, agrupados por su tipo.
-        # El orden en las llaves es el orden de impresión deseado.
         classified_tokens = {
             'VARIABLE': set(),
-            'SIGNO': set(),
+            'SIGNO': set(), 
             'SIMBOLO': set(),
-            'NUMERO': set()
+            'NUMERO': set() 
         }
 
+        # Conjunto temporal para registrar que ya mostramos el par '()'
+        parenthesis_found = False
+
         for token in tokens:
-
-            if token in KEYWORDS:
+            if token in KEYWORDS or token in IGNORE_SIMBOLS:
                 continue
-
+            
             token_type = ""
             
-            if token in KEYWORDS: # Las palabras clave se consideran PALABRA_CLAVE, pero las agruparemos con VARIABLES
-                token_type = "VARIABLE"
-            elif token in OPERATORS:
+            if token in OPERATORS:
                 token_type = "SIGNO"
                 classified_tokens[token_type].add((token, OPERATORS_MAP[token]))
-                continue
-            elif token == AGRUPATION_TOKEN:
-                token_type = "SIMBOLO"
-                classified_tokens[token_type].add((token, AGRUPATION_NAME))
-                continue
+            
             elif token in INDIVIDUAL_SIMBOLS:
                 token_type = "SIMBOLO"
-                classified_tokens[token_type].add((token, token.upper()))
-                continue
-            elif token.replace('.', '', 1).isdigit():
-                # Verificación robusta para números (enteros o flotantes)
-                token_type = "NUMERO"
-            elif token.isalpha() or (token[0].isalpha() and token.isalnum()):
-                # Identificadores (Variables)
-                token_type = "VARIABLE"
-            else:
-                # No clasificado (ej: cadena de texto, error léxico)
-                token_type = "OTROS"
+                
+                # ⭐️ CLAVE: Manejo y Agrupación de Paréntesis
+                if token in ("(", ")"):
+                    if not parenthesis_found:
+                        # Si no hemos registrado el par, lo añadimos como token único '()'
+                        classified_tokens[token_type].add(("()", "AGRUPACIÓN"))
+                        parenthesis_found = True
+                    continue # Ignoramos el '(' o ')' individual después de registrar el par
+
+                # Manejo de Símbolos Individuales restantes (ej. '=' y ';')
+                classified_tokens[token_type].add((token, SIMBOLS_MAP[token]))
             
-            # Agregamos el token a su conjunto correspondiente (esto elimina duplicados automáticamente)
-            if token_type in classified_tokens:
+            elif token.replace('.', '', 1).isdigit():
+                token_type = "NUMERO"
+                valor_en_letras = self.number_to_text(token)
+                classified_tokens[token_type].add((token, valor_en_letras))
+                
+            elif token.isalpha() or (token[0].isalpha() and token.isalnum()):
+                token_type = "VARIABLE"
                 classified_tokens[token_type].add(token)
+            
+            # Nota: Si se llega aquí, se ignora la clasificación en 'OTROS', ya que solo nos interesan los definidos.
+
 
         # 4. Generación de la Salida Ordenada
-        output_lines = ["--- RESULTADO DEL ANÁLISIS LÉXICO ---"]
-
-        # Definimos el orden de impresión explícitamente
+        output_lines = ["--- RESULTADO DEL ANÁLISIS LÉXICO (Llaves {} y Palabras Clave Omitidas) ---"]
         print_order = ['VARIABLE', 'SIGNO', 'SIMBOLO', 'NUMERO']
+        variable_counter = 1 
 
         for type_name in print_order:
-        
-            if type_name == 'SIGNO':
-                # MANEJO ESPECIAL PARA SIGNOS (Tuplas de 2 elementos: signo, nombre)
-                tokens_list = sorted(list(classified_tokens[type_name]), key=lambda x: x[0])
-            elif type_name == 'SIMBOLO':
-                # MANEJO ESPECIAL PARA SÍMBOLOS (Tuplas de 2 elementos: simbolo, nombre)
-                tokens_list = sorted(list(classified_tokens[type_name]), key=lambda x: x[0])
-            else:
-                # MANEJO ESTÁNDAR para otros tipos (Variables y Números)
-                tokens_list = sorted(list(classified_tokens[type_name]))
+            
+            # Ordenamiento:
+            tokens_list = sorted(list(classified_tokens[type_name]), key=lambda x: x[0] if isinstance(x, tuple) else x)
                 
             if tokens_list:
                 output_lines.append(f"\n[{type_name.upper()}]:")
                 
                 for token_item in tokens_list:
-                    if type_name in ('SIGNO', 'SIMBOLO'):
-                        # Desempaquetar la tupla (token, nombre)
+                    
+                    if type_name == 'VARIABLE':
+                        token = token_item
+                        output_lines.append(f"{token} Tipo: {type_name.capitalize()} #{variable_counter}")
+                        variable_counter += 1
+                        
+                    elif type_name in ('SIGNO', 'SIMBOLO'):
                         token, nombre = token_item
-                        output_lines.append(f"{token} Tipo: {type_name.capitalize()} ({nombre.capitalize()})")
-                    else:
-                        # Formato para Variables y Números
-                        output_lines.append(f"{token_item} Tipo: {type_name.capitalize()}")
+                        output_lines.append(f"{token} Tipo: {type_name.capitalize()} {nombre.capitalize()}")
+                        
+                    elif type_name == 'NUMERO':
+                        token, valor_en_letras = token_item
+                        output_lines.append(f"{token} Tipo: {type_name.capitalize()} {valor_en_letras.capitalize()}")
 
         return '\n'.join(output_lines)
     
