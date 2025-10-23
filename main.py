@@ -115,18 +115,26 @@ class ventanaPrincipal:
         widget.insert (tk.END, content)
         widget.config (state = 'disabled')
 
-    def run_analysis (self):
+    def run_analysis(self):
         """ Método para el boton Iniciar Compilación """
         source_code = self.code_area.get("1.0", tk.END).strip()
         if not source_code:
             self.clear_and_insert(self.analisis_lexico_output, "Por favor, ingrese código para analizar.")
+            # Limpiar también la pestaña sintáctica si no hay código
+            self.clear_and_insert(self.analisis_sintactico_output, "") 
             return
         
-        # Ejecucución del Análisis Léxico
+        # 1. Ejecucución del Análisis Léxico
         lexical_output = self.perform_lexical_analysis(source_code)
-
-        # Mostrar el resultado en la pestaña de Análisis Léxico
         self.clear_and_insert(self.analisis_lexico_output, lexical_output)
+        
+        # 2. ⭐️ EJECUCIÓN DEL ANÁLISIS SINTÁCTICO ⭐️
+        # Nota: Aquí no pasamos los tokens de salida, sino los lexemas limpios.
+        self.perform_syntactic_analysis(source_code, None) 
+        
+        # Puedes añadir llamadas a otras fases aquí:
+        # self.perform_semantic_analysis(source_code)
+
 
     # Función para convertir números a texto en español
     def number_to_text(self, number_str):
@@ -288,6 +296,214 @@ class ventanaPrincipal:
                         output_lines.append(f"{token} Tipo: {type_name.capitalize()} {valor_en_letras.capitalize()}")
 
         return '\n'.join(output_lines)
+    
+    # Coloca esta función dentro de la clase ventanaPrincipal
+# Coloca esta función dentro de la clase ventanaPrincipal
+    def infix_to_postfix_simulation(self, tokens):
+        """
+        Genera Notación Postfija (N.P.) para una expresión, incluyendo la asignación (=).
+        Maneja la asociatividad de derecha a izquierda para la asignación (=).
+        """
+        if not tokens:
+            return ""
+
+        # Precedencia de operadores
+        # Asignación tiene la menor precedencia, pero se maneja de forma especial por asociatividad
+        precedence = {'=': 0, '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, '(': 4}
+        
+        output = []
+        operator_stack = []
+
+        for token in tokens:
+            if token.replace('.', '', 1).isdigit() or token.isalpha():
+                output.append(token) # Es un operando (número o variable)
+            elif token in precedence: # Es un operador
+                
+                # ⭐️ Lógica de ASOCIATIVIDAD IZQUIERDA (Para +, -, *, /)
+                while (operator_stack and 
+                    operator_stack[-1] != '(' and 
+                    operator_stack[-1] != '=' and # No sacar asignación si la precedencia es igual
+                    precedence.get(operator_stack[-1], 0) >= precedence[token]):
+                    output.append(operator_stack.pop())
+                    
+                # ⭐️ Lógica de ASOCIATIVIDAD DERECHA (Para =)
+                if token == '=':
+                    # La asignación se apila inmediatamente, sin sacar operadores de igual precedencia.
+                    # Sacar solo operadores de *mayor* precedencia.
+                    while (operator_stack and 
+                        operator_stack[-1] != '(' and 
+                        precedence.get(operator_stack[-1], 0) > precedence[token]):
+                        output.append(operator_stack.pop())
+                
+                operator_stack.append(token)
+                
+            elif token == '(':
+                operator_stack.append(token)
+            elif token == ')':
+                while operator_stack and operator_stack[-1] != '(':
+                    output.append(operator_stack.pop())
+                if operator_stack and operator_stack[-1] == '(':
+                    operator_stack.pop() # Descartar '('
+        
+        # Vaciar la pila
+        while operator_stack:
+            output.append(operator_stack.pop())
+            
+        return " ".join(output)
+            # Coloca esta función dentro de la clase ventanaPrincipal
+        # Coloca esta función dentro de la clase ventanaPrincipal
+
+# Reemplaza la función perform_syntactic_analysis
+    # Reemplaza la función perform_syntactic_analysis
+    def perform_syntactic_analysis(self, source_code, lexical_tokens):
+        """
+        Simula la generación de la Notación Postfija y el Árbol AST
+        para cada sentencia de ASIGNACIÓN detectada, ignorando declaraciones.
+        """
+        if not source_code:
+            # ... (código de manejo de error)
+            return
+
+        syntactic_output = "--- RESULTADO DEL ANÁLISIS SINTÁCTICO ---\n\n"
+        output_parts = []
+        
+        # Dividimos el código por el fin de sentencia (punto y coma)
+        sentences = source_code.split(';')
+        
+        operation_counter = 1
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            # 1. Obtener los lexemas limpios de LA SENTENCIA
+            # Esto incluye tokens como 'a', '=', '12', pero también 'int', 'main', etc.
+            clean_tokens = self._get_clean_lexemes(sentence) 
+            
+            # 2. ⭐️ FILTRO CLAVE: Procesamos sentencias que contengan asignación ('=')
+            if '=' not in clean_tokens:
+                continue
+            
+            # 3. Eliminar tokens de declaración y otros irrelevantes que quedaron
+            final_tokens = [t for t in clean_tokens if t not in ['int', 'double', 'float', 'void', 'boolean', 'main', '(', ')', '{', '}']]
+            
+            # 4. Debemos re-evaluar si la expresión sigue siendo una asignación válida
+            if '=' not in final_tokens or len(final_tokens) < 3:
+                continue
+                
+            # 5. Generar Notación Postfija
+            postfix_notation = self.infix_to_postfix_simulation(final_tokens)
+            
+            # 6. Simular la estructura del Árbol (AST)
+            tree_simulation = self._simulate_parse_tree(final_tokens)
+            
+            # 7. Formatear la salida para esta operación
+            operation_output = f"--- OPERACIÓN {operation_counter} ---\n"
+            operation_output += f"EXPRESIÓN INFIJA: {' '.join(final_tokens)}\n\n"
+            operation_output += f"N.P. (Notación Postfija):\n{postfix_notation}\n\n"
+            operation_output += "ÁRBOL DE SINTAXIS ABSTRACTA (AST):\n"
+            operation_output += tree_simulation
+            operation_output += "\n"
+            
+            output_parts.append(operation_output)
+            operation_counter += 1
+
+        # 7. Generar la Salida Final
+        if output_parts:
+            syntactic_output += "\n".join(output_parts)
+        else:
+            syntactic_output += "No se encontraron operaciones de asignación para analizar."
+
+        self.clear_and_insert(self.analisis_sintactico_output, syntactic_output)
+
+    def _get_clean_lexemes(self, code):
+        """
+        Función auxiliar para obtener una lista limpia de lexemas (tokens) del código.
+        Ahora ignora las llaves {} para el tokenizado.
+        """
+        OPERATORS = {"+", "-", "*", "/", "^"}
+        # SIMBOLS ahora incluye las llaves para aislamiento, pero las quitaremos al final.
+        SIMBOLS = {"=", ";", "(", ")", "{", "}"} 
+        
+        # Aislamiento de todos los símbolos
+        for char_to_isolate in OPERATORS | SIMBOLS:
+            # Añadir espacios alrededor de los símbolos
+            code = code.replace(char_to_isolate, f" {char_to_isolate} ")
+        
+        # Limpiar múltiples espacios
+        code = ' '.join(code.split())
+        
+        # Obtener los tokens limpios y EXCLUIR las llaves.
+        # Quitaremos 'int', 'main', y los otros al inicio, ya que el problema es la expresión larga.
+        
+        tokens = [part.strip() for part in code.split() if part.strip()]
+        
+        # Filtramos la línea 'int main() { ... }' y los tipos de datos/declaraciones.
+        # Solo devolvemos los tokens que no son keywords estructurales.
+        keywords_to_ignore = {'int', 'double', 'float', 'void', 'main', '{', '}'}
+        return [t for t in tokens if t not in keywords_to_ignore]
+
+    def _simulate_parse_tree(self, tokens):
+        """
+        Simula una estructura de Árbol de Sintaxis Abstracta (AST) para ASIGNACIONES,
+        donde el nodo raíz es el operador de asignación.
+        """
+        
+        if '=' not in tokens:
+            return "Árbol no generado (No es una asignación simple)."
+
+        # En una asignación simple: [Var, =, Expr]
+        
+        try:
+            root_index = tokens.index('=')
+            variable_node = tokens[root_index - 1]
+            expression_tokens = tokens[root_index + 1:]
+        except (ValueError, IndexError):
+            return "Error al identificar la asignación en los tokens."
+        
+        tree = f"|-- =\n"
+        
+        # ⭐️ Lado Izquierdo (Siempre la variable)
+        tree += f"    |-- {variable_node} (Terminal)\n"
+        
+        # ⭐️ Lado Derecho (La expresión a evaluar)
+        
+        operators = {'+': 1, '-': 1, '*': 2, '/': 2, '^': 3}
+        
+        if not expression_tokens:
+            tree += "    |-- VACÍO\n"
+        elif len(expression_tokens) == 1:
+            # Ejemplo: a = 12
+            tree += f"    |-- {expression_tokens[0]} (Terminal)\n"
+        elif any(op in expression_tokens for op in operators):
+            # Es una expresión compleja (ej: d/134)
+            
+            # Encuentra la raíz de la SUB-EXPRESIÓN (operador de menor precedencia)
+            sub_root_op = None
+            sub_root_index = -1
+            min_precedence = 4
+            
+            for i, token in enumerate(expression_tokens):
+                if token in operators and operators[token] <= min_precedence:
+                    min_precedence = operators[token]
+                    sub_root_op = token
+                    sub_root_index = i
+            
+            if sub_root_op:
+                sub_left = expression_tokens[:sub_root_index]
+                sub_right = expression_tokens[sub_root_index + 1:]
+                
+                tree += f"    |-- {sub_root_op} (Operación)\n"
+                tree += f"        |-- {sub_left[0] if sub_left else 'ERROR'} (Terminal)\n"
+                tree += f"        |-- {sub_right[0] if sub_right else 'ERROR'} (Terminal)\n"
+            else:
+                tree += f"    |-- ERROR_EXPR (Tokens: {expression_tokens})\n"
+                
+        else:
+            tree += f"    |-- {expression_tokens[0]} (Terminal)\n"
+            
+        return tree
     
 if __name__ == "__main__":
     root = tk.Tk()
